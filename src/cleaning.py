@@ -142,7 +142,7 @@ def apply_club_filters(df: pd.DataFrame) -> pd.DataFrame:
         elif 75 <= carry <= 85:
             return "SW_75-85"
         else:
-            return "SW_OTHER"
+            return None
 
     is_sw = df["Club"] == "SW"
     df.loc[is_sw, "Club"] = df.loc[is_sw, "Carry"].apply(split_sw)
@@ -161,11 +161,11 @@ def apply_club_filters(df: pd.DataFrame) -> pd.DataFrame:
     }
 
     filtered_rows = []
-    no_filter_clubs = {"LW_0-40", "LW_40-50", "LW_50-60", "LW_60-70",
-                       "SW_70-75", "SW_75-85", "SW_OTHER"}
+    already_filtered_clubs = {"LW_0-40", "LW_40-50", "LW_50-60", "LW_60-70",
+                       "SW_70-75", "SW_75-85"}
 
     for club, group in df.groupby("Club"):
-        if club in no_filter_clubs:
+        if club in already_filtered_clubs:
             filtered_rows.append(group)
         elif club in carry_ranges:
             low, high = carry_ranges[club]
