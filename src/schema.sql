@@ -62,5 +62,6 @@ CREATE TABLE model_runs (
     run_date        TIMESTAMP DEFAULT NOW(),
     club_id         INT REFERENCES clubs(club_id),  -- NULL means analysis was ran across multiple clubs
     features_used   TEXT NOT NULL,  -- comma-separated list of predictor variables
-    r_squared       NUMERIC(5,4)
+    r_squared       NUMERIC(5,4),
+    results_json    TEXT
 );
