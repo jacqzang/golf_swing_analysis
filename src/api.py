@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from psycopg2.extras import RealDictCursor
 import psycopg2
 import os
+import json
 
 app = FastAPI(title="Golf Swing Analysis API")
 
@@ -113,17 +114,34 @@ def get_club_shots(club: str, conn=Depends(get_db)):
 #This function returns the most recent model run from model_runs
 @app.get("/analysis/latest")
 def get_latest_analysis(conn=Depends(get_db)):
+    """Return all four group regression results from the most recent run."""
     cur = conn.cursor()
     cur.execute("""
-        SELECT run_id, run_date, club_id, features_used, r_squared, notes
+        SELECT run_id, run_date, r_squared, results_json
         FROM model_runs
         ORDER BY run_date DESC
-        LIMIT 1
+        LIMIT 4
     """)
-    result = cur.fetchone()
-    if not result:
+    results = cur.fetchall()
+    if not results:
         raise HTTPException(status_code=404, detail="No analysis runs found yet")
-    return result
+
+    parsed = []
+    for row in results:
+        data = json.loads(row["results_json"])
+        parsed.append({
+            "run_id": row["run_id"],
+            "run_date": str(row["run_date"]),
+            "r_squared": float(row["r_squared"]) if row["r_squared"] else None,
+            "group": data.get("group"),
+            "n": data.get("n"),
+            "r2_train": data.get("r2_train"),
+            "r2_test": data.get("r2_test"),
+            "coefficients": data.get("coefficients"),
+            "features_used": data.get("features_used"),
+            "per_club_correlations": data.get("per_club_correlations"),
+        })
+    return parsed
 
 """
 This creates a placeholder for uploading new session data

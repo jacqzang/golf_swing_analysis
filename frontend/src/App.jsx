@@ -415,18 +415,362 @@ function ClubMetricsPage() {
 // ------------------------------------------------
 
 function AnalysisPage() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [selectedGroup, setSelectedGroup] = useState("irons")
+  const [expandedFinding, setExpandedFinding] = useState(null)
+
+  useEffect(() => {
+    fetch(`${API_BASE}/analysis/latest`)
+      .then(res => res.json())
+      .then(json => {
+        setData(json)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const groupOrder = ["pitches", "wedges", "irons", "driving"]
+  const groupLabels = {
+    pitches: "Pitches",
+    wedges: "Wedges",
+    irons: "Irons",
+    driving: "Woods & Driver"
+  }
+
+  const activeGroup = data?.find(g => g.group === selectedGroup)
+
+  const predictorLabels = {
+    club_path: "Club Path",
+    face_angle: "Face Angle",
+    club_speed: "Club Speed",
+    attack_angle: "Attack Angle",
+    smash_factor: "Smash Factor"
+  }
+
+  const findings = [
+    {
+      number: "01",
+      title: "Face angle consistently affects shot quality",
+      bullets: [
+        "Face angle was statistically significant in 9 of 13 club groups, more than any other variable.",
+        "The strongest relationships were with 8 iron (r = +0.54) and LW 60–70 yards (r = +0.68).",
+        "This is important because face angle largely determines the ball's initial launch direction, especially for irons and wedges. Since those are the approach clubs, direction is more important for them.",
+        "Small face angle errors increase lateral dispersion, making it harder to finish near the target, so the quality of the shot decreases.",
+      ],
+      conclusion: "Thus, delivering a square, consistent club face at impact is likely more important than changing swing path for improving shot quality."
+    },
+    {
+      number: "02",
+      title: "Club path matters, but under specific conditions",
+      bullets: [
+        "Club path was significant for the 5 wood, 8 iron, 9 iron, and LW 60–70, but not for most other clubs.",
+        "Club path still matters because it influences ball curvature through the face-to-path relationship rather than the ball's initial launch direction.",
+        "When face angle is controlled, moderate path changes often have only a small effect on where the shot finishes. However, when the face angle is not controlled, the club path has a larger effect on how the ball curves.",
+      ],
+      conclusion: "Thus, to produce the highest quality shots, establish consistent face control first, then refine club path to further reduce shot dispersion."
+    },
+    {
+      number: "03",
+      title: "Club speed predicts consistency for full irons",
+      bullets: [
+        "Club speed was statistically significant for 7 iron (r = +0.23), 8 iron (r = +0.45), and 9 iron (r = +0.30), but not for wedges or the driver.",
+        "Consistent club speed reflects a consistent swing, leading to more consistent carry distances which are important for approach shots with irons.",
+        "Reduced carry variation improves the quality score by keeping shots closer to the intended target distance.",
+        "Wedge shots intentionally vary swing length and speed for distance control which makes club speed a less meaningful predictor.",
+      ],
+      conclusion: "Thus, developing a repeatable swing that produces consistent club speed is an important component of improving iron play. This is something that was not considered before."
+    },
+    {
+      number: "04",
+      title: "Pitch shots appear to depend more on feel rather than mechanics",
+      bullets: [
+        "Pitch shots (0–85 yards) produced almost no meaningful relationships with the measured TrackMan variables (test R² = 0.04).",
+        "The shortest lob wedge distances showed no statistically significant correlations with any measured swing variable.",
+        "Unlike full swings, pitch shots rely heavily on distance control, trajectory, spin, landing angle, and feel — many of which are not directly captured by the variables in this analysis.",
+      ],
+      conclusion: "Thus, improving pitch performance likely depends more on touch, practice, and shot selection than on optimizing mechanics alone. They are very different swings, full swings and pitch shots, so this makes sense."
+    },
+    {
+      number: "05",
+      title: "Full iron swings are the most predictable part of the game",
+      bullets: [
+        "The iron regression achieved the highest predictive performance of any club group (test R² = 0.20).",
+        "Full iron swings are generally more repeatable than drivers or partial wedges, leading to stronger relationships between swing mechanics and shot quality.",
+        "Face angle, club speed, attack angle, and club path together explained more variation in iron shot quality than in any other club category.",
+      ],
+      conclusion: null
+    },
+    {
+      number: "06",
+      title: "Weak regression performance shows the limitations of the measured variables",
+      bullets: [
+        "The wedge and driving models produced negative test R² values, so the linear models did not reliably predict shot quality.",
+        "For wedges, face angle was often the only significant predictor, leaving little additional information for a multi-variable model to learn from.",
+        "Driver performance is influenced by many unmeasured factors, including impact location, spin axis, dynamic loft, launch conditions, and tee height.",
+      ],
+      conclusion: "For the future, more comprehensive measurements or nonlinear machine learning models may better capture the complex relationships that determine wedge and driver performance."
+    },
+  ]
+
   return (
     <div className="page">
       <div className="page-header">
         <p className="page-label">Statistical Analysis</p>
         <h1 className="page-title">Analysis</h1>
-        <p className="page-subtitle">Correlation results, regression findings, and which variables actually predict shot quality.</p>
+        <p className="page-subtitle">
+          Pearson correlation coefficients and OLS regression results by club group.
+          <b> Face angle</b> is the most consistent predictor of shot quality across the bag.
+        </p>
       </div>
+
       <div className="page-content">
-        <div className="analysis-placeholder">
-          <h3>Analysis Coming Soon</h3>
-          <p>Pearson correlation coefficients and OLS regression results will appear here once the model pipeline is built.</p>
-        </div>
+        {loading && <p className="loading">Loading analysis results...</p>}
+
+        {data && (
+          <>
+            {/* Verdict Banner */}
+            <div style={{
+              background: "#111111",
+              border: "1px solid #1e1e1e",
+              borderLeft: "3px solid #c9a84c",
+              padding: "24px 32px",
+              marginBottom: "40px"
+            }}>
+              <p style={{ fontSize: "11px", letterSpacing: "0.2em", textTransform: "uppercase", color: "#c9a84c", marginBottom: "8px" }}>
+                Verdict on Theory
+              </p>
+              <p style={{ fontSize: "18px", color: "#ffffff", fontFamily: "Georgia, serif", lineHeight: "1.6" }}>
+                Partially supported because <em>face angle</em> is the primary predictor, rather than both club path and face angle together.
+                Face angle is statistically significant in 9 of 13 club groups tested.
+                Club path is weaker and inconsistent across the bag.
+              </p>
+            </div>
+
+            {/* Group Selector */}
+            <div className="club-selector-row">
+              <p className="selector-label">Select Club Group</p>
+              <div className="club-buttons">
+                {groupOrder.map(group => (
+                  <button
+                    key={group}
+                    className={`club-btn ${selectedGroup === group ? "active" : ""}`}
+                    onClick={() => setSelectedGroup(group)}
+                  >
+                    {groupLabels[group]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {activeGroup && (
+              <>
+                {/* Regression Summary + Coefficients */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px", background: "#1e1e1e", border: "1px solid #1e1e1e", marginBottom: "32px" }}>
+                  <div style={{ background: "#111111", padding: "32px" }}>
+                    <p className="page-label" style={{ marginBottom: "24px" }}>OLS Regression Model</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                      {[
+                        { label: "Sample Size", value: `${activeGroup.n} shots` },
+                        { label: "R² (train)", value: activeGroup.r2_train },
+                        { label: "R² (test)", value: activeGroup.r2_test },
+                        { label: "Predictors", value: "Club Path, Face Angle, Club Speed, Attack Angle, Smash Factor" },
+                      ].map(item => (
+                        <div key={item.label} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #1a1a1a", paddingBottom: "12px" }}>
+                          <span style={{ fontSize: "13px", color: "#9ca3af", letterSpacing: "0.05em" }}>{item.label}</span>
+                          <span style={{ fontSize: "13px", color: activeGroup.r2_test < 0 && item.label === "R² (test)" ? "#ef4444" : "#ffffff", fontFamily: "Georgia, serif" }}>{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {activeGroup.r2_test < 0.05 && (
+                      <p style={{ fontSize: "12px", color: "#9ca3af", fontStyle: "italic", marginTop: "16px" }}>
+                        Note: Low R² indicates these swing variables explain limited variance in shot quality for this group.
+                      </p>
+                    )}
+                  </div>
+
+                  <div style={{ background: "#111111", padding: "32px" }}>
+                    <p className="page-label" style={{ marginBottom: "24px" }}>Standardized Coefficients</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {activeGroup.coefficients && Object.entries(activeGroup.coefficients)
+                        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                        .map(([pred, coef]) => {
+                          const maxCoef = Math.max(...Object.values(activeGroup.coefficients).map(Math.abs))
+                          const barWidth = Math.abs(coef) / maxCoef * 100
+                          const isPositive = coef >= 0
+                          return (
+                            <div key={pred}>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                                <span style={{ fontSize: "13px", color: "#9ca3af" }}>{predictorLabels[pred] || pred}</span>
+                                <span style={{ fontSize: "13px", color: isPositive ? "#1FA607" : "#c40808", fontFamily: "Georgia, serif" }}>
+                                  {isPositive ? "+" : ""}{coef.toFixed(3)}
+                                </span>
+                              </div>
+                              <div style={{ height: "4px", background: "#1a1a1a", borderRadius: "2px" }}>
+                                <div style={{
+                                  height: "100%",
+                                  width: `${barWidth}%`,
+                                  background: isPositive ? "#1FA607" : "#c40808",
+                                  borderRadius: "2px"
+                                }} />
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per-Club Correlations */}
+                <div style={{ background: "#111111", border: "1px solid #1e1e1e", padding: "32px" }}>
+                  <p className="page-label" style={{ marginBottom: "8px" }}>Per-Club Pearson Correlations</p>
+                  <p style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "24px" }}>
+                    ✓ = statistically significant (p &lt; 0.05). Sorted by face angle correlation strength.
+                  </p>
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="thresholds-table">
+                      <thead>
+                        <tr>
+                          <th>Club</th>
+                          <th>n</th>
+                          <th>Club Path</th>
+                          <th>Face Angle</th>
+                          <th>Face to Path</th>
+                          <th>Club Speed</th>
+                          <th>Attack Angle</th>
+                          <th>Smash Factor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeGroup.per_club_correlations &&
+                          Object.entries(activeGroup.per_club_correlations)
+                            .sort((a, b) => {
+                              const rA = a[1].correlations?.face_angle?.r || 0
+                              const rB = b[1].correlations?.face_angle?.r || 0
+                              return Math.abs(rB) - Math.abs(rA)
+                            })
+                            .map(([club, clubData]) => (
+                              <tr key={club}>
+                                <td style={{ color: "#ffffff", fontFamily: "Georgia, serif" }}>{club}</td>
+                                <td style={{ color: "#9ca3af" }}>{clubData.n}</td>
+                                {["club_path", "face_angle", "face_to_path", "club_speed", "attack_angle", "smash_factor"].map(pred => {
+                                  const corr = clubData.correlations?.[pred]
+                                  if (!corr) return <td key={pred} style={{ color: "#9ca3af" }}>—</td>
+                                  const color = corr.significant
+                                    ? (corr.r > 0 ? "#1FA607" : "#c40808")
+                                    : "#9ca3af"
+                                  return (
+                                    <td key={pred} style={{ color, fontFamily: "Georgia, serif" }}>
+                                      {corr.significant ? "✓ " : ""}{corr.r > 0 ? "+" : ""}{corr.r.toFixed(3)}
+                                    </td>
+                                  )
+                                })}
+                              </tr>
+                            ))
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Quality Score Methodology */}
+            <div style={{
+              background: "#111111",
+              border: "1px solid #1e1e1e",
+              borderLeft: "3px solid #1e1e1e",
+              padding: "36px 32px",
+              marginTop: "32px",
+            }}>
+              <p style={{ fontSize: "11px", color: "#c9a84c", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px" }}>
+                Methodology — Quality Score
+              </p>
+              <p style={{ fontSize: "15px", color: "#9ca3af", lineHeight: "1.8" }}>
+                Standardizing shot quality allows meaningful comparisons across clubs. Rather than measuring raw carry or lateral error, each shot was scored using its Euclidean distance from the intended target after normalizing carry and lateral deviations by each club's historical variability. This produces a club-independent quality score ranging from 0 to 100, allowing a 7-iron shot, pitching wedge, and driver to be compared on the same scale despite their vastly different expected distances and dispersions. That normalization makes cross-club statistical analysis possible and is a key methodological contribution of the project.
+              </p>
+              <p style={{ fontSize: "13px", fontFamily: "monospace", marginTop: "16px", color: "#c9a84c" }}>
+                quality_distance = √(carry_z² + side_z²) &nbsp;&nbsp;|&nbsp;&nbsp; quality_score = 100 × e^(−d / 1.5)
+              </p>
+            </div>
+
+            {/* Key Findings */}
+            <p className="page-label" style={{ marginTop: "48px", marginBottom: "16px" }}>Key Findings (click for more details)</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px", background: "#1e1e1e", border: "1px solid #1e1e1e" }}>
+              {findings.map(finding => {
+                const isExpanded = expandedFinding === finding.number
+                return (
+                  <div
+                    key={finding.number}
+                    style={{
+                      background: "#111111",
+                      padding: "36px 32px",
+                      cursor: isExpanded ? "default" : "pointer",
+                      transition: "background 0.2s",
+                      position: "relative"
+                    }}
+                    onClick={() => !isExpanded && setExpandedFinding(finding.number)}
+                  >
+                    {/* X button when expanded */}
+                    {isExpanded && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpandedFinding(null)
+                        }}
+                        style={{
+                          position: "absolute",
+                          top: "24px",
+                          right: "24px",
+                          background: "none",
+                          border: "none",
+                          color: "#c9a84c",
+                          fontSize: "18px",
+                          cursor: "pointer",
+                          padding: "0",
+                          lineHeight: "1"
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+
+                    <p style={{ fontSize: "11px", color: "#c9a84c", letterSpacing: "0.15em", marginBottom: "12px" }}>
+                      {finding.number}
+                    </p>
+                    <h3 style={{
+                      fontSize: "18px",
+                      fontWeight: "400",
+                      color: "#ffffff",
+                      fontFamily: "Georgia, serif",
+                      marginBottom: isExpanded ? "20px" : "0",
+                      paddingRight: isExpanded ? "32px" : "0"
+                    }}>
+                      {finding.title}
+                    </h3>
+
+                    {isExpanded && (
+                      <>
+                        <ul style={{ paddingLeft: "16px", display: "flex", flexDirection: "column", gap: "10px", marginBottom: finding.conclusion ? "16px" : "0" }}>
+                          {finding.bullets.map((bullet, i) => (
+                            <li key={i} style={{ fontSize: "14px", color: "#9ca3af", lineHeight: "1.7", listStyleType: "disc" }}>
+                              {bullet}
+                            </li>
+                          ))}
+                        </ul>
+                        {finding.conclusion && (
+                          <p style={{ fontSize: "14px", color: "#c9a84c", lineHeight: "1.7", fontStyle: "italic", borderTop: "1px solid #1e1e1e", paddingTop: "12px", marginTop: "4px" }}>
+                            {finding.conclusion}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
