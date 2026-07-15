@@ -12,7 +12,7 @@ import "./App.css"
 
 ChartJS.register(LinearScale, PointElement, Tooltip, Legend)
 
-const API_BASE = "http://localhost:8000"
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000"
 
 const CLUBS = [
   "LW_0-40", "LW_40-50", "LW_50-60", "LW_60-70",
