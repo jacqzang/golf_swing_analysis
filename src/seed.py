@@ -5,18 +5,19 @@ It reads the data in cleaned_shots.csv and inserts rows into sessions, clubs, sh
 
 import pandas as pd
 import psycopg2
+import os
 from psycopg2.extras import execute_values
+from src.cleaning import parse_side
 
-#Connection settings for Docker
 DB_CONFIG = {
-    "host":     "localhost",
+    "host":     os.environ.get("DB_HOST"),
     "port":     5432,
-    "dbname":   "golf_swing",
-    "user":     "golf_user",
-    "password": "golf_pass",
+    "dbname":   os.environ.get("DB_NAME"),
+    "user":     os.environ.get("DB_USER"),
+    "password": os.environ.get("DB_PASSWORD"),
 }
 
-#Targets per club, matching schema.sql
+#Targets per club which are matching with schema.sql
 #Side thresholds in feet and one-sided, carry thresholds in yards
 #None means not applicable for that club
 TARGETS = [
@@ -74,7 +75,7 @@ negative floats mean left and positive floats mean right
 def seed_shots(cur, df, date_to_id, club_to_id):
     shot_rows = []
     for _, row in df.iterrows():
-        side_ft = parse_side(row["Side"])
+        side_ft = row["Side"]
         shot_rows.append((
             date_to_id[row["Date"]],
             club_to_id[row["Club"]],
@@ -113,21 +114,6 @@ def seed_targets(cur, club_to_id):
                 great_carry_low, great_carry_high
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (club_to_id[club_name], *row[1:]))
-
-"""
-This helper function converts Trackman side distance (a string) to float in feet.
-"14.1L" -> -14.1 (left is negative)
-"0.5R"  ->  0.5  (right is positive)
-"0"     ->  0.0
-"""
-def parse_side(side_str):
-    side_str = str(side_str).strip()
-    if side_str.endswith("L"):
-        return -float(side_str[:-1])
-    elif side_str.endswith("R"):
-        return float(side_str[:-1])
-    else:
-        return float(side_str)
 
 if __name__ == "__main__":
     df = pd.read_csv("data/processed/cleaned_shots.csv")

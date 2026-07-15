@@ -61,7 +61,7 @@ function Nav({ activePage, setActivePage }) {
 // Landing Page
 // ------------------------------------------------
 
-function LandingPage({ sessions, setActivePage }) {
+function LandingPage({ sessions, totalShots, setActivePage }) {
   return (
     <div>
       <section className="hero">
@@ -78,7 +78,7 @@ function LandingPage({ sessions, setActivePage }) {
           </p>
           <div className="hero-stats">
             <div>
-              <span className="hero-stat-number">1,184</span>
+              <span className="hero-stat-number">{totalShots.toLocaleString()}</span>
               <span className="hero-stat-label">Total Shots</span>
             </div>
             <div>
@@ -780,8 +780,7 @@ function AnalysisPage() {
 // Sessions page
 // ------------------------------------------------
 
-function SessionsPage({ sessions }) {
-  const totalShots = 1184
+function SessionsPage({ sessions, totalShots }) {
   const avgPerSession = sessions.length ? Math.round(totalShots / sessions.length) : 0
 
   const formatDate = (dateStr) => {
@@ -795,7 +794,7 @@ function SessionsPage({ sessions }) {
         <div>
           <p className="page-label">Training Log</p>
           <h1 className="page-title">Sessions</h1>
-          <p className="page-subtitle">All {sessions.length} range sessions from August 2025 through June 2026.</p>
+          <p className="page-subtitle">All {sessions.length} range sessions from August 2025 through present day.</p>
         </div>
         <div className="sessions-header-stats">
           <div className="sessions-stat">
@@ -803,7 +802,7 @@ function SessionsPage({ sessions }) {
             <span className="sessions-stat-label">Sessions</span>
           </div>
           <div className="sessions-stat">
-            <span className="sessions-stat-number">1,184</span>
+            <span className="sessions-stat-number">{totalShots.toLocaleString()}</span>
             <span className="sessions-stat-label">Total Shots</span>
           </div>
           <div className="sessions-stat">
@@ -830,7 +829,70 @@ function SessionsPage({ sessions }) {
 // Upload page
 // ------------------------------------------------
 
-function UploadPage() {
+function UploadPage({ onUploadSuccess }) {
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [apiKey, setApiKey] = useState("")
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [result, setResult] = useState(null) // { success: bool, message: string }
+  const [dragOver, setDragOver] = useState(false)
+
+  const handleFileSelect = (file) => {
+    if (file && file.name.endsWith(".csv")) {
+      setSelectedFile(file)
+      setResult(null)
+    }
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    handleFileSelect(e.dataTransfer.files[0])
+  }
+
+  const handleUpload = () => {
+    if (!selectedFile || !apiKey) return
+
+    setUploading(true)
+    setProgress(0)
+    setResult(null)
+
+    const formData = new FormData()
+    formData.append("file", selectedFile)
+
+    // Using XMLHttpRequest instead of fetch because fetch doesn't
+    // expose upload progress events - XHR does via upload.onprogress
+    const xhr = new XMLHttpRequest()
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        setProgress(Math.round((e.loaded / e.total) * 100))
+      }
+    }
+
+    xhr.onload = () => {
+      setUploading(false)
+      if (xhr.status === 200) {
+        const response = JSON.parse(xhr.responseText)
+        setResult({ success: true, message: `Session(s) added — ${response.rows_added} shots` })
+        setSelectedFile(null)
+        onUploadSuccess()
+      } else {
+        const errorText = xhr.responseText
+        setResult({ success: false, message: `Upload failed: ${errorText}` })
+      }
+    }
+
+    xhr.onerror = () => {
+      setUploading(false)
+      setResult({ success: false, message: "Upload failed: could not reach server" })
+    }
+
+    xhr.open("POST", `${API_BASE}/upload`)
+    xhr.setRequestHeader("X-API-Key", apiKey)
+    xhr.send(formData)
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -841,15 +903,82 @@ function UploadPage() {
       <div className="page-content" style={{ display: "flex", justifyContent: "center" }}>
         <div className="upload-card">
           <p className="selector-label">Trackman CSV Export</p>
-          <div className="upload-dropzone">
+
+          <div
+            className="upload-dropzone"
+            style={{ borderColor: dragOver ? "#c9a84c" : undefined, cursor: "pointer" }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => document.getElementById("csv-file-input").click()}
+          >
             <div style={{ fontSize: "32px", marginBottom: "16px", color: "#c9a84c" }}>↑</div>
-            <p>Drop your Trackman CSV here</p>
+            <p>{selectedFile ? selectedFile.name : "Drop Trackman CSV here"}</p>
             <small>or click to browse · .csv files only</small>
+            <input
+              id="csv-file-input"
+              type="file"
+              accept=".csv"
+              style={{ display: "none" }}
+              onChange={(e) => handleFileSelect(e.target.files[0])}
+            />
           </div>
+
+          <div style={{ margin: "20px 0" }}>
+            <input
+              type="password"
+              placeholder="API Key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                background: "#0a0a0a",
+                border: "1px solid #1e1e1e",
+                color: "#ffffff",
+                fontFamily: "Georgia, serif"
+              }}
+            />
+          </div>
+
+          {uploading && (
+            <div style={{ margin: "16px 0" }}>
+              <p style={{ fontSize: "13px", color: "#c9a84c", marginBottom: "8px" }}>
+                Uploading {progress}% Complete
+              </p>
+              <div style={{ height: "4px", background: "#1a1a1a", borderRadius: "2px" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${progress}%`,
+                  background: "#c9a84c",
+                  borderRadius: "2px",
+                  transition: "width 0.2s"
+                }} />
+              </div>
+            </div>
+          )}
+
+          {result && (
+            <p style={{
+              fontSize: "14px",
+              color: result.success ? "#1FA607" : "#c40808",
+              marginTop: "12px",
+              fontFamily: "Georgia, serif"
+            }}>
+              {result.success ? "✓ " : "✕ "}{result.message}
+            </p>
+          )}
+
           <div style={{ display: "flex", justifyContent: "center" }}>
-            <button className="upload-submit">Upload Session →</button>
+            <button
+              className="upload-submit"
+              disabled={!selectedFile || !apiKey || uploading}
+              onClick={handleUpload}
+              style={{ opacity: (!selectedFile || !apiKey || uploading) ? 0.5 : 1 }}
+            >
+              {uploading ? "Uploading..." : "Upload Session →"}
+            </button>
           </div>
-          <p className="upload-coming-soon">S3 / Lambda pipeline coming soon — upload functionality will be live after cloud deployment.</p>
         </div>
       </div>
     </div>
@@ -863,22 +992,35 @@ function UploadPage() {
 export default function App() {
   const [activePage, setActivePage] = useState("overview")
   const [sessions, setSessions] = useState([])
+  const [totalShots, setTotalShots] = useState(0)
 
-  useEffect(() => {
+  const fetchSessions = () => {
     fetch(`${API_BASE}/sessions`)
       .then(res => res.json())
       .then(data => setSessions(data))
       .catch(err => console.error("Failed to fetch sessions:", err))
+  }
+
+  const fetchShotCount = () => {
+    fetch(`${API_BASE}/shots/count`)
+      .then(res => res.json())
+      .then(data => setTotalShots(data.total_shots))
+      .catch(err => console.error("Failed to fetch shot count:", err))
+  }
+
+  useEffect(() => {
+    fetchSessions()
+    fetchShotCount()
   }, [])
 
   return (
     <div className="app">
       <Nav activePage={activePage} setActivePage={setActivePage} />
-      {activePage === "overview" && <LandingPage sessions={sessions} setActivePage={setActivePage} />}
+      {activePage === "overview" && <LandingPage sessions={sessions} totalShots={totalShots} setActivePage={setActivePage} />}
       {activePage === "metrics" && <ClubMetricsPage />}
       {activePage === "analysis" && <AnalysisPage />}
-      {activePage === "sessions" && <SessionsPage sessions={sessions} />}
-      {activePage === "upload" && <UploadPage />}
+      {activePage === "sessions" && <SessionsPage sessions={sessions} totalShots={totalShots} />}
+      {activePage === "upload" && <UploadPage onUploadSuccess={() => { fetchSessions(); fetchShotCount(); }} />}
     </div>
   )
 }

@@ -32,12 +32,12 @@ metric_columns = {
 
 date_column_index = 14
 
-def parse_raw_export(raw_csv_path: str) -> pd.DataFrame:
-    """
-    Read the raw stacked Trackman export and return a tidy DataFrame with 
-    one row per shot that includes: Club, Date, and the 10 metric columns.
-    """
-    raw = pd.read_csv(raw_csv_path, header = None)
+"""
+This function cleans the raw stacked Trackman export and return a tidy DataFrame with 
+one row per shot that includes: Club, Date, and the 10 metric columns.
+"""
+def parse_raw_export(raw_csv_source) -> pd.DataFrame:
+    raw = pd.read_csv(raw_csv_source, header = None)
     tidy_rows = []
     current_club = None
     current_date = None
@@ -183,7 +183,23 @@ def convert_metrics_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
                     "Attack Angle", "Ball Speed", "Spin Rate", "Smash Factor"]
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["Side"] = df["Side"].apply(parse_side)
     return df
+
+"""
+This helper function converts Trackman side distance (a string) to float in feet.
+"14.1L" -> -14.1 (left is negative)
+"0.5R"  ->  0.5  (right is positive)
+"0"     ->  0.0
+"""
+def parse_side(side_str):
+    side_str = str(side_str).strip()
+    if side_str.endswith("L"):
+        return -float(side_str[:-1])
+    elif side_str.endswith("R"):
+        return float(side_str[:-1])
+    else:
+        return float(side_str)
 
 #Guard for when the file is imported; only runs when you run the file yourself
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import psycopg2
 import json
+import os
 from psycopg2.extras import RealDictCursor
 from scipy.stats import pearsonr
 from sklearn.linear_model import LinearRegression
@@ -25,11 +26,11 @@ from sklearn.metrics import r2_score
 from sklearn.preprocessing import StandardScaler
 
 DB_CONFIG = {
-    "host":     "localhost",
+    "host":     os.environ.get("DB_HOST"),
     "port":     5432,
-    "dbname":   "golf_swing",
-    "user":     "golf_user",
-    "password": "golf_pass",
+    "dbname":   os.environ.get("DB_NAME"),
+    "user":     os.environ.get("DB_USER"),
+    "password": os.environ.get("DB_PASSWORD"),
 }
 
 PREDICTORS = [
@@ -219,6 +220,24 @@ def run_group_regression(df: pd.DataFrame, group_name: str, club_names: list) ->
     }
 
 """
+This function runs the complete analysis pipeline where load data, compute quality scores,
+run correlations and regressions, save results to model_runs all work. 
+It's called from analysis.py's __main__ block and from api.py after a successful upload.
+"""
+def run_full_analysis(conn):
+    df = load_data(conn)
+    df = compute_quality_scores(df)
+
+    correlations = run_per_club_correlations(df)
+
+    regressions = []
+    for group_name, club_names in CLUB_GROUPS.items():
+        result = run_group_regression(df, group_name, club_names)
+        regressions.append(result)
+
+    save_results_to_db(conn, correlations, regressions)
+
+"""
 Then finally insert analysis results into the model_runs table.
 This function stores one row per group regression, with correlations as JSON in results_json.
 """
@@ -269,44 +288,6 @@ def save_results_to_db(conn, correlations: dict, regressions: list):
 
 if __name__ == "__main__":
     conn = psycopg2.connect(**DB_CONFIG, cursor_factory=RealDictCursor)
-
-    print("Loading data from Postgres...")
-    df = load_data(conn)
-    print(f"Loaded {len(df)} shots across {df['club_name'].nunique()} clubs")
-
-    print("Computing quality scores...")
-    df = compute_quality_scores(df)
-    print(f"Quality score range: {df['quality_score'].min():.1f} - {df['quality_score'].max():.1f}")
-    print(f"Quality score mean: {df['quality_score'].mean():.1f}")
-
-    print("\nRunning per-club correlations...")
-    correlations = run_per_club_correlations(df)
-    for club, data in correlations.items():
-        print(f"\n{club} (n={data['n']}):")
-        if "note" in data:
-            print(f"  {data['note']}")
-        else:
-            for pred, stats in data["correlations"].items():
-                sig = "✓" if stats["significant"] else " "
-                print(f"  {sig} {pred:20s} r={stats['r']:+.3f}  p={stats['p']:.3f}")
-
-    print("\nRunning group regressions...")
-    regressions = []
-    for group_name, club_names in CLUB_GROUPS.items():
-        result = run_group_regression(df, group_name, club_names)
-        regressions.append(result)
-        print(f"\n{group_name} (n={result['n']}):")
-        if "note" in result and "r2_test" not in result:
-            print(f"  {result['note']}")
-        else:
-            print(f"  R² train: {result['r2_train']}")
-            print(f"  R² test:  {result['r2_test']}")
-            print(f"  Coefficients:")
-            for pred, coef in result["coefficients"].items():
-                print(f"    {pred:20s} {coef:+.4f}")
-
-    print("\nSaving results to database...")
-    save_results_to_db(conn, correlations, regressions)
-
+    run_full_analysis(conn)
     conn.close()
-    print("\nDone.")
+    print("Done.")
